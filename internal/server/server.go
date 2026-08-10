@@ -266,6 +266,7 @@ func loadMapLayers(maps fs.FS) ([]mapLayer, map[string]mapFile, error) {
 	if len(manifest.Layers) != mapdata.LayerCount {
 		return nil, nil, fmt.Errorf("embedded map manifest must contain %d supported layers", mapdata.LayerCount)
 	}
+	baseUrl := "."  // vite.config.ts の base を参照する
 	layers := make([]mapLayer, 0, len(manifest.Layers))
 	files := make(map[string]mapFile, len(manifest.Layers))
 	ids := make(map[string]struct{}, len(manifest.Layers))
@@ -287,7 +288,7 @@ func loadMapLayers(maps fs.FS) ([]mapLayer, map[string]mapFile, error) {
 		files[source.File] = mapFile{sha256: strings.ToLower(source.SHA256), version: strings.ToLower(source.SHA256[:12])}
 		layer := mapLayer{
 			ID: source.ID, Name: source.Name, Bounds: source.Bounds,
-			ImageURL: fmt.Sprintf("/assets/map/%s?v=%s", url.PathEscape(source.File), strings.ToLower(source.SHA256[:12])),
+			ImageURL: fmt.Sprintf("%s/assets/map/%s?v=%s", baseUrl, url.PathEscape(source.File), strings.ToLower(source.SHA256[:12])),
 		}
 		if source.TilePyramid == nil {
 			return nil, nil, fmt.Errorf("embedded map layer %q has no tile pyramid", source.ID)

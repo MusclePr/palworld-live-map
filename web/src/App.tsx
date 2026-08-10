@@ -76,8 +76,8 @@ export function App() {
     const controller = new AbortController()
     const load = async () => {
       try {
-        const response = await fetch('/api/config', { cache: 'no-store', signal: controller.signal })
-        if (!response.ok) throw new Error(`/api/config returned ${response.status}`)
+        const response = await fetch('./api/config', { cache: 'no-store', signal: controller.signal })
+        if (!response.ok) throw new Error(`./api/config returned ${response.status}`)
         const nextConfig = (await response.json()) as PublicConfig
         setConfig(nextConfig)
         setConfigError(false)
@@ -181,8 +181,8 @@ function LiveMap({
   catalogueError: boolean
   onRetryCatalogue: () => void
 }) {
-  const players = usePolling<PlayerState>('/api/players', config.pollIntervalMs)
-  const objects = usePolling<ObjectState>('/api/objects', config.worldPollIntervalMs, config.worldDataEnabled)
+  const players = usePolling<PlayerState>('./api/players', config.pollIntervalMs)
+  const objects = usePolling<ObjectState>('./api/objects', config.worldPollIntervalMs, config.worldDataEnabled)
   const claimSession = usePlayerClaimSession()
   const expectedCatalogueVersion = useMemo(() => catalogueVersionFromURL(config.catalogueUrl), [config.catalogueUrl])
   const { state: saveProgress } = useSaveProgress(claimSession.session, {
