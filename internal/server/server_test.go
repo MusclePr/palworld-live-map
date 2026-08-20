@@ -403,7 +403,7 @@ func TestPublicConfigUsesManifestAssetHash(t *testing.T) {
 	if !strings.Contains(body, `/assets/map/palpagos.jpg?v=`) || strings.Contains(body, `?v=8192`) {
 		t.Fatalf("config response does not use manifest asset hash: %s", body)
 	}
-	if !strings.Contains(body, `"catalogueUrl":"/api/catalogue?v=`+service.worldCatalogue.ContentHash+`"`) {
+	if !strings.Contains(body, `"catalogueUrl":"./api/catalogue?v=`+service.worldCatalogue.ContentHash+`"`) {
 		t.Fatalf("config response does not use world catalogue content hash: %s", body)
 	}
 	if !strings.Contains(body, `"kind":"alpha-pals"`) || !strings.Contains(body, `"name":"Penking"`) || !strings.Contains(body, `"id":"landmark:tower:REGION_Grass_Boss"`) {
@@ -412,6 +412,13 @@ func TestPublicConfigUsesManifestAssetHash(t *testing.T) {
 	if !strings.Contains(body, `"landmarkCatalogue":{"gameVersion":"1.0.3.101283","generator":"palworld-asset-exporter/4"`) {
 		t.Fatalf("config response does not expose landmark provenance: %s", body)
 	}
+}
+
+func normalizeURL(url string) string {
+	if strings.HasPrefix(url, "./") {
+		return url[1:]
+	}
+	return url
 }
 
 func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
@@ -429,14 +436,20 @@ func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
 		t.Fatalf("unversioned map cache headers = cache %q, etag %q", allowed.Header().Get("Cache-Control"), allowed.Header().Get("ETag"))
 	}
 
+	// for debug
+	// t.Fatalf("TestServerServesOnlyKnownEmbeddedMapArtwork: service.layers[0].ImageURL=\"%s\"", service.layers[0].ImageURL)
+	// "./assets/map/palpagos.jpg?v=9961632d5c38" --> "/assets/map/palpagos.jpg?v=9961632d5c38"
+	imageURL := normalizeURL(service.layers[0].ImageURL)
+
 	versioned := httptest.NewRecorder()
-	service.Handler().ServeHTTP(versioned, httptest.NewRequest(http.MethodGet, service.layers[0].ImageURL, nil))
+	service.Handler().ServeHTTP(versioned, httptest.NewRequest(http.MethodGet, imageURL, nil))
 	if versioned.Code != http.StatusOK || !strings.Contains(versioned.Header().Get("Cache-Control"), "immutable") {
 		t.Fatalf("versioned map response = status %d, cache %q", versioned.Code, versioned.Header().Get("Cache-Control"))
 	}
 
 	tileTemplate := service.layers[0].TilePyramid.URLTemplate
 	tileURL := strings.NewReplacer("{size}", strconv.Itoa(service.layers[0].TilePyramid.Levels[0]), "{x}", "0", "{y}", "0").Replace(tileTemplate)
+	tileURL = normalizeURL(tileURL)
 	tile := httptest.NewRecorder()
 	service.Handler().ServeHTTP(tile, httptest.NewRequest(http.MethodGet, tileURL, nil))
 	if tile.Code != http.StatusOK || tile.Header().Get("Content-Type") != "image/webp" || !strings.Contains(tile.Header().Get("Cache-Control"), "immutable") || tile.Header().Get("ETag") == "" {
@@ -449,7 +462,7 @@ func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
 		t.Fatalf("wrong-version map cache policy = %q", wrongVersion.Header().Get("Cache-Control"))
 	}
 
-	rangeRequest := httptest.NewRequest(http.MethodGet, service.layers[0].ImageURL, nil)
+	rangeRequest := httptest.NewRequest(http.MethodGet, imageURL, nil)
 	rangeRequest.Header.Set("Range", "bytes=0-15")
 	ranged := httptest.NewRecorder()
 	service.Handler().ServeHTTP(ranged, rangeRequest)
@@ -457,7 +470,7 @@ func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
 		t.Fatalf("range response = status %d, size %d, content-range %q", ranged.Code, ranged.Body.Len(), ranged.Header().Get("Content-Range"))
 	}
 
-	notModifiedRequest := httptest.NewRequest(http.MethodGet, service.layers[0].ImageURL, nil)
+	notModifiedRequest := httptest.NewRequest(http.MethodGet, imageURL, nil)
 	notModifiedRequest.Header.Set("If-None-Match", versioned.Header().Get("ETag"))
 	notModified := httptest.NewRecorder()
 	service.Handler().ServeHTTP(notModified, notModifiedRequest)
@@ -478,7 +491,7 @@ func TestServerServesVersionedWorldCatalogue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	if service.catalogueURL != "/api/catalogue?v="+service.worldCatalogue.ContentHash {
+	if service.catalogueURL != "./api/catalogue?v="+service.worldCatalogue.ContentHash {
 		t.Fatalf("catalogue URL = %q", service.catalogueURL)
 	}
 
@@ -514,7 +527,8 @@ func TestServerServesVersionedWorldCatalogue(t *testing.T) {
 	}
 
 	versioned := httptest.NewRecorder()
-	service.Handler().ServeHTTP(versioned, httptest.NewRequest(http.MethodGet, service.catalogueURL, nil))
+	catalogueURL := normalizeURL(service.catalogueURL)
+	service.Handler().ServeHTTP(versioned, httptest.NewRequest(http.MethodGet, catalogueURL, nil))
 	if versioned.Code != http.StatusOK ||
 		!strings.Contains(versioned.Header().Get("Cache-Control"), "immutable") {
 		t.Fatalf(
@@ -532,7 +546,7 @@ func TestServerServesVersionedWorldCatalogue(t *testing.T) {
 		t.Fatalf("wrong-version catalogue cache policy = %q", wrongVersion.Header().Get("Cache-Control"))
 	}
 
-	notModifiedRequest := httptest.NewRequest(http.MethodGet, service.catalogueURL, nil)
+	notModifiedRequest := httptest.NewRequest(http.MethodGet, catalogueURL, nil)
 	notModifiedRequest.Header.Set("If-None-Match", versioned.Header().Get("ETag"))
 	notModified := httptest.NewRecorder()
 	service.Handler().ServeHTTP(notModified, notModifiedRequest)
@@ -540,7 +554,7 @@ func TestServerServesVersionedWorldCatalogue(t *testing.T) {
 		t.Fatalf("conditional catalogue = status %d, body %q", notModified.Code, notModified.Body.String())
 	}
 
-	gzipRequest := httptest.NewRequest(http.MethodGet, service.catalogueURL, nil)
+	gzipRequest := httptest.NewRequest(http.MethodGet, catalogueURL, nil)
 	gzipRequest.Header.Set("Accept-Encoding", "gzip")
 	compressed := httptest.NewRecorder()
 	service.Handler().ServeHTTP(compressed, gzipRequest)
@@ -595,6 +609,73 @@ func TestServerServesViteFrontendAssets(t *testing.T) {
 	service.Handler().ServeHTTP(favicon, httptest.NewRequest(http.MethodGet, "/assets/favicon.svg", nil))
 	if favicon.Code != http.StatusOK || favicon.Header().Get("Content-Type") != "image/svg+xml" || !strings.Contains(favicon.Body.String(), "<svg") {
 		t.Fatalf("favicon response = status %d, type %q, body %q", favicon.Code, favicon.Header().Get("Content-Type"), favicon.Body.String())
+	}
+}
+
+func TestServerServesUnderConfiguredBasePath(t *testing.T) {
+	cfg := testConfig()
+	cfg.BasePath = "/palworld-map"
+	service, err := New(cfg, fixedSnapshot{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	bare := httptest.NewRecorder()
+	service.Handler().ServeHTTP(bare, httptest.NewRequest(http.MethodGet, "/palworld-map", nil))
+	if bare.Code != http.StatusMovedPermanently || bare.Header().Get("Location") != "/palworld-map/" {
+		t.Fatalf("bare prefix response = status %d, location %q", bare.Code, bare.Header().Get("Location"))
+	}
+
+	index := httptest.NewRecorder()
+	service.Handler().ServeHTTP(index, httptest.NewRequest(http.MethodGet, "/palworld-map/", nil))
+	if index.Code != http.StatusOK || !strings.Contains(index.Body.String(), `<div id="root"></div>`) {
+		t.Fatalf("index response = status %d, body %s", index.Code, index.Body.String())
+	}
+
+	config := httptest.NewRecorder()
+	service.Handler().ServeHTTP(config, httptest.NewRequest(http.MethodGet, "/palworld-map/api/config", nil))
+	if config.Code != http.StatusOK {
+		t.Fatalf("api config response = status %d", config.Code)
+	}
+
+	unprefixed := httptest.NewRecorder()
+	service.Handler().ServeHTTP(unprefixed, httptest.NewRequest(http.MethodGet, "/api/config", nil))
+	if unprefixed.Code != http.StatusNotFound {
+		t.Fatalf("unprefixed request should 404, got status %d", unprefixed.Code)
+	}
+}
+
+func TestRoutesRespectConfiguredBasePath(t *testing.T) {
+	service := &Server{
+		basePath: "/palworld-map",
+		assets: fstest.MapFS{
+			"index.html": &fstest.MapFile{Data: []byte(`<div id="root"></div>`)},
+		},
+	}
+	service.handler = service.securityHeaders(service.routes())
+
+	bare := httptest.NewRecorder()
+	service.Handler().ServeHTTP(bare, httptest.NewRequest(http.MethodGet, "/palworld-map", nil))
+	if bare.Code != http.StatusMovedPermanently || bare.Header().Get("Location") != "/palworld-map/" {
+		t.Fatalf("bare prefix response = status %d, location %q", bare.Code, bare.Header().Get("Location"))
+	}
+
+	index := httptest.NewRecorder()
+	service.Handler().ServeHTTP(index, httptest.NewRequest(http.MethodGet, "/palworld-map/", nil))
+	if index.Code != http.StatusOK || !strings.Contains(index.Body.String(), `<div id="root"></div>`) {
+		t.Fatalf("index response = status %d, body %s", index.Code, index.Body.String())
+	}
+
+	health := httptest.NewRecorder()
+	service.Handler().ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/palworld-map/-/health", nil))
+	if health.Code != http.StatusOK {
+		t.Fatalf("health response = status %d", health.Code)
+	}
+
+	unprefixed := httptest.NewRecorder()
+	service.Handler().ServeHTTP(unprefixed, httptest.NewRequest(http.MethodGet, "/-/health", nil))
+	if unprefixed.Code != http.StatusNotFound {
+		t.Fatalf("unprefixed request should 404, got status %d", unprefixed.Code)
 	}
 }
 
@@ -654,7 +735,8 @@ func TestLoadMapLayersUsesManifestArtworkForShippedLayers(t *testing.T) {
 	service.handler = service.securityHeaders(service.routes())
 	started := time.Now()
 	response := &deadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
-	service.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, layers[0].ImageURL, nil))
+	requestPath := "/" + strings.TrimPrefix(layers[0].ImageURL, "./")
+	service.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, requestPath, nil))
 	if response.Code != http.StatusOK || response.Body.String() != "test map artwork" {
 		t.Fatalf("map response = status %d, body %q", response.Code, response.Body.String())
 	}

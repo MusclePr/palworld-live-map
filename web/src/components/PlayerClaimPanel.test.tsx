@@ -148,7 +148,7 @@ describe('question-only character connection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Change to a different question' }))
     await screen.findByText('Different question?')
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock.mock.calls[1][0]).toBe('/api/player-claims/questions/cycle')
+    expect(fetchMock.mock.calls[1][0]).toBe('./api/player-claims/questions/cycle')
   })
 
   it('disconnects with an Authorization bearer and clears immediately', async () => {

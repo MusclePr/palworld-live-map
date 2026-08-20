@@ -58,6 +58,58 @@ func TestLoadRejectsSaveDataInDemoMode(t *testing.T) {
 	}
 }
 
+func TestNormalizeBasePath(t *testing.T) {
+	cases := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{name: "empty stays root", input: "", want: ""},
+		{name: "blank stays root", input: "   ", want: ""},
+		{name: "adds leading slash", input: "palworld-map", want: "/palworld-map"},
+		{name: "drops trailing slash", input: "/palworld-map/", want: "/palworld-map"},
+		{name: "keeps nested segments", input: "/wiki/palworld-map", want: "/wiki/palworld-map"},
+		{name: "rejects bare slash", input: "/", wantErr: true},
+		{name: "rejects traversal", input: "/../etc", wantErr: true},
+		{name: "rejects repeated slashes", input: "/wiki//map", wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := NormalizeBasePath(tc.input)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("NormalizeBasePath(%q) error = nil, want error", tc.input)
+				}
+				return
+			}
+			if err != nil || got != tc.want {
+				t.Fatalf("NormalizeBasePath(%q) = (%q, %v), want (%q, nil)", tc.input, got, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestLoadAppliesBasePath(t *testing.T) {
+	validEnvironment(t)
+	t.Setenv("BASE_PATH", "/palworld-map/")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.BasePath != "/palworld-map" {
+		t.Fatalf("BasePath = %q, want /palworld-map", cfg.BasePath)
+	}
+}
+
+func TestLoadRejectsInvalidBasePath(t *testing.T) {
+	validEnvironment(t)
+	t.Setenv("BASE_PATH", "/")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() error = nil, want error for invalid BASE_PATH")
+	}
+}
+
 func TestLoadRealModeRequiresPalworldCredentials(t *testing.T) {
 	t.Setenv("PALWORLD_REST_URL", "")
 	t.Setenv("PALWORLD_ADMIN_PASSWORD", "")

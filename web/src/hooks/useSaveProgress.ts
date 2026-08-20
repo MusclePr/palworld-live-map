@@ -129,7 +129,7 @@ export function useSaveProgress(session: SaveProgressSession, options: SaveProgr
 
     const load = async () => {
       try {
-        const response = await fetch('/api/me/progress', {
+        const response = await fetch('./api/me/progress', {
           cache: 'no-store',
           headers: { Authorization: `Bearer ${connectedBearer}` },
           signal: controller.signal
@@ -140,9 +140,9 @@ export function useSaveProgress(session: SaveProgressSession, options: SaveProgr
           options.onUnauthorized?.()
           return
         }
-        if (!response.ok) throw new Error(`/api/me/progress returned ${response.status}`)
+        if (!response.ok) throw new Error(`./api/me/progress returned ${response.status}`)
         const snapshot = parseSaveProgress(await response.json())
-        if (!snapshot) throw new Error('/api/me/progress returned an invalid payload')
+        if (!snapshot) throw new Error('./api/me/progress returned an invalid payload')
         if (!currentRequest()) return
         if (snapshot.catalogueVersion !== options.expectedCatalogueVersion) {
           if (retained) {

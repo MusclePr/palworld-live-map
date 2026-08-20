@@ -53,7 +53,7 @@ describe('useSaveProgress', () => {
 
     await waitFor(() => expect(result.current.state.phase).toBe('available'))
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/me/progress',
+      './api/me/progress',
       expect.objectContaining({ cache: 'no-store', headers: { Authorization: 'Bearer session-token' } })
     )
 

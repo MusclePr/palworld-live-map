@@ -160,7 +160,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       setNotice(null)
       setChallenge(null)
       try {
-        const response = await postJSON('/api/player-claims', { playerId })
+        const response = await postJSON('./api/player-claims', { playerId })
         if (!response.ok) {
           const error = await readError(response)
           setNotice(
@@ -192,7 +192,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
     setCycling(true)
     setNotice(null)
     try {
-      const response = await postJSON('/api/player-claims/questions/cycle', {
+      const response = await postJSON('./api/player-claims/questions/cycle', {
         challengeToken: challenge.token,
         questionId: challenge.question.id
       })
@@ -227,7 +227,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
     setChallenge({ ...challenge, phase: 'checking' })
     setNotice(null)
     try {
-      const response = await postJSON('/api/player-claims/verify', {
+      const response = await postJSON('./api/player-claims/verify', {
         challengeToken: challenge.token,
         answers: [{ questionId: challenge.question.id, option: challenge.answer }]
       })
@@ -271,7 +271,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
     setSession({ phase: 'anonymous' })
     setChallenge(null)
     try {
-      await postJSON('/api/logout', {}, bearer)
+      await postJSON('./api/logout', {}, bearer)
     } finally {
       setDisconnecting(false)
     }

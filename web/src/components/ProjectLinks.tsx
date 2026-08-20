@@ -16,7 +16,7 @@ export function ProjectLinks({ hidden }: ProjectLinksProps) {
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div className="flex h-full items-center gap-2 px-2.5">
-        <img className="size-7 shrink-0" src="/assets/favicon.svg" alt="" aria-hidden="true" draggable={false} />
+        <img className="size-7 shrink-0" src="./assets/favicon.svg" alt="" aria-hidden="true" draggable={false} />
         <span className="whitespace-nowrap text-xs tracking-[.025em] text-[#e2f3f5]">Palworld Live Map</span>
       </div>
       <a
