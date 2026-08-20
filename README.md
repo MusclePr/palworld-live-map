@@ -135,6 +135,7 @@ Every supported environment option and timeout is listed below and documented in
 | `DEMO_MODE`               | Use fictional data and do not contact Palworld                       | `false`                |
 | `HTTP_PORT`               | Host port published by Compose                                       | `8080`                 |
 | `ADDR`                    | Address the Go HTTP server listens on                                | `:8080`                |
+| `BASE_PATH`               | Path prefix for serving behind a reverse proxy at a subpath           | empty (root)           |
 | `POLL_INTERVAL`           | Player and metrics refresh interval; minimum `2s`                    | `5s`                   |
 | `UPSTREAM_TIMEOUT`        | Player and server-information timeout; must be below `POLL_INTERVAL` | `4s`                   |
 | `WORLD_DATA_ENABLED`      | Poll bases, Pals, and NPCs                                           | `true`                 |
@@ -146,6 +147,10 @@ Every supported environment option and timeout is listed below and documented in
 | `SAVE_POLL_INTERVAL`      | Save enrichment interval; minimum `15s`                              | `30s`                  |
 | `SAVE_TIMEOUT`            | Whole-generation timeout; must be below `SAVE_POLL_INTERVAL`         | `20s`                  |
 | `PLAYER_CLAIMS_ENABLED`   | Enable save-backed “This is me” character connection                 | `false`                |
+
+To serve the site behind a reverse proxy at a subpath (e.g. `https://example.com/palworld-map/`),
+set `BASE_PATH` to that prefix and configure the reverse proxy to forward it **without stripping**
+the prefix (see the commented example in [`nginx.conf`](nginx.conf)).
 
 To enable save integration, mount the server's `SaveGames/0` directory read-only
 and set `SAVE_DATA_ENABLED=true`. The image includes the pinned

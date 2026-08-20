@@ -38,6 +38,7 @@ type snapshotSource interface {
 
 type Server struct {
 	settings           serverSettings
+	basePath           string
 	source             snapshotSource
 	assets             fs.FS
 	maps               fs.FS
@@ -177,10 +178,11 @@ func NewWithClaims(cfg config.Config, source snapshotSource, claims *playerclaim
 			pollInterval: cfg.PollInterval, worldPollInterval: cfg.WorldPollInterval,
 			worldDataEnabled: cfg.WorldDataEnabled, playerClaimsEnabled: cfg.PlayerClaimsEnabled,
 		},
-		source: source, assets: webAssets, maps: maps, mapFiles: mapFiles, layers: layers,
+		basePath: cfg.BasePath,
+		source:   source, assets: webAssets, maps: maps, mapFiles: mapFiles, layers: layers,
 		landmarks: landmarkCatalogue.Locations, landmarkCatalogue: landmarkCatalogue.Metadata,
 		worldCatalogue: worldCatalogue, claims: claims,
-		catalogueURL: "/api/catalogue?v=" + worldCatalogue.ContentHash,
+		catalogueURL: "./api/catalogue?v=" + worldCatalogue.ContentHash,
 	}
 	if claims != nil {
 		s.claimStartLimiter = newClaimRequestLimiter(5, 10*time.Minute, 100, time.Minute)
@@ -196,26 +198,35 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) routes() http.Handler {
+	p := s.basePath
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /-/health", s.health)
-	mux.HandleFunc("GET /api/config", s.publicConfig)
-	mux.HandleFunc("GET /api/catalogue", s.catalogue)
-	mux.HandleFunc("GET /api/players", s.players)
-	mux.HandleFunc("GET /api/objects", s.objects)
-	mux.HandleFunc("GET /api/state", s.state)
+	mux.HandleFunc("GET "+p+"/-/health", s.health)
+	mux.HandleFunc("GET "+p+"/api/config", s.publicConfig)
+	mux.HandleFunc("GET "+p+"/api/catalogue", s.catalogue)
+	mux.HandleFunc("GET "+p+"/api/players", s.players)
+	mux.HandleFunc("GET "+p+"/api/objects", s.objects)
+	mux.HandleFunc("GET "+p+"/api/state", s.state)
 	if s.claims != nil {
-		mux.HandleFunc("POST /api/player-claims", s.startPlayerClaim)
-		mux.HandleFunc("POST /api/player-claims/questions/cycle", s.cyclePlayerClaimQuestion)
-		mux.HandleFunc("POST /api/player-claims/verify", s.verifyPlayerClaim)
-		mux.HandleFunc("GET /api/me", s.claimSession)
-		mux.HandleFunc("GET /api/me/progress", s.claimProgress)
-		mux.HandleFunc("POST /api/logout", s.logoutClaimSession)
+		mux.HandleFunc("POST "+p+"/api/player-claims", s.startPlayerClaim)
+		mux.HandleFunc("POST "+p+"/api/player-claims/questions/cycle", s.cyclePlayerClaimQuestion)
+		mux.HandleFunc("POST "+p+"/api/player-claims/verify", s.verifyPlayerClaim)
+		mux.HandleFunc("GET "+p+"/api/me", s.claimSession)
+		mux.HandleFunc("GET "+p+"/api/me/progress", s.claimProgress)
+		mux.HandleFunc("POST "+p+"/api/logout", s.logoutClaimSession)
 	}
-	mux.HandleFunc("GET /", s.index)
-	mux.HandleFunc("GET /assets/{path...}", s.webAsset)
-	mux.HandleFunc("GET /assets/map/{file}", s.mapAsset)
+	mux.HandleFunc("GET "+p+"/", s.index)
+	mux.HandleFunc("GET "+p+"/assets/{path...}", s.webAsset)
+	mux.HandleFunc("GET "+p+"/assets/map/{file}", s.mapAsset)
+	if p != "" {
+		// bare prefix without trailing slash has no route of its own; send it to the index
+		mux.HandleFunc("GET "+p, s.redirectToBasePath)
+	}
 
 	return mux
+}
+
+func (s *Server) redirectToBasePath(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, s.basePath+"/", http.StatusMovedPermanently)
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
@@ -266,6 +277,7 @@ func loadMapLayers(maps fs.FS) ([]mapLayer, map[string]mapFile, error) {
 	if len(manifest.Layers) != mapdata.LayerCount {
 		return nil, nil, fmt.Errorf("embedded map manifest must contain %d supported layers", mapdata.LayerCount)
 	}
+	baseUrl := "." // vite.config.ts の base を参照する
 	layers := make([]mapLayer, 0, len(manifest.Layers))
 	files := make(map[string]mapFile, len(manifest.Layers))
 	ids := make(map[string]struct{}, len(manifest.Layers))
@@ -287,7 +299,7 @@ func loadMapLayers(maps fs.FS) ([]mapLayer, map[string]mapFile, error) {
 		files[source.File] = mapFile{sha256: strings.ToLower(source.SHA256), version: strings.ToLower(source.SHA256[:12])}
 		layer := mapLayer{
 			ID: source.ID, Name: source.Name, Bounds: source.Bounds,
-			ImageURL: fmt.Sprintf("/assets/map/%s?v=%s", url.PathEscape(source.File), strings.ToLower(source.SHA256[:12])),
+			ImageURL: fmt.Sprintf("%s/assets/map/%s?v=%s", baseUrl, url.PathEscape(source.File), strings.ToLower(source.SHA256[:12])),
 		}
 		if source.TilePyramid == nil {
 			return nil, nil, fmt.Errorf("embedded map layer %q has no tile pyramid", source.ID)
@@ -354,7 +366,7 @@ func loadMapTilePyramid(maps fs.FS, layerID string, source *mapManifestTilePyram
 	return &mapTilePyramid{
 		TileSize:    source.TileSize,
 		Levels:      levels,
-		URLTemplate: fmt.Sprintf("/assets/map/%s-z{size}-x{x}-y{y}.webp?v=%s", url.PathEscape(layerID), version),
+		URLTemplate: fmt.Sprintf("./assets/map/%s-z{size}-x{x}-y{y}.webp?v=%s", url.PathEscape(layerID), version),
 	}, files, nil
 }
 
@@ -449,7 +461,7 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
+	if r.URL.Path != s.basePath+"/" {
 		http.NotFound(w, r)
 		return
 	}

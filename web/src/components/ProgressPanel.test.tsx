@@ -109,7 +109,11 @@ describe('ProgressPanel', () => {
       'fetch',
       vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         const path =
-          typeof input === 'string' ? input : input instanceof URL ? input.pathname : new URL(input.url).pathname
+          typeof input === 'string'
+            ? new URL(input, window.location.href).pathname
+            : input instanceof URL
+              ? input.pathname
+              : new URL(input.url).pathname
         requests.push({ path, init })
         if (path === '/api/player-claims')
           return new Response(

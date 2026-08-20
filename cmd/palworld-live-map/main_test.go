@@ -31,3 +31,21 @@ func TestHealthcheckEndpointRejectsInvalidAddress(t *testing.T) {
 		t.Fatal("healthcheckEndpoint() error = nil")
 	}
 }
+
+func TestHealthcheckEndpointAppliesBasePath(t *testing.T) {
+	t.Setenv("BASE_PATH", "/palworld-map/")
+	got, err := healthcheckEndpoint(":8080")
+	if err != nil {
+		t.Fatalf("healthcheckEndpoint() error = %v", err)
+	}
+	if want := "http://127.0.0.1:8080/palworld-map/-/health"; got != want {
+		t.Fatalf("healthcheckEndpoint() = %q, want %q", got, want)
+	}
+}
+
+func TestHealthcheckEndpointRejectsInvalidBasePath(t *testing.T) {
+	t.Setenv("BASE_PATH", "/")
+	if _, err := healthcheckEndpoint(":8080"); err == nil {
+		t.Fatal("healthcheckEndpoint() error = nil")
+	}
+}

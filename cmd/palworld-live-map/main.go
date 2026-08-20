@@ -174,5 +174,9 @@ func healthcheckEndpoint(addr string) (string, error) {
 	if host == "" || host == "0.0.0.0" || host == "::" {
 		host = "127.0.0.1"
 	}
-	return (&url.URL{Scheme: "http", Host: net.JoinHostPort(host, port), Path: "/-/health"}).String(), nil
+	basePath, err := config.NormalizeBasePath(os.Getenv("BASE_PATH"))
+	if err != nil {
+		return "", fmt.Errorf("BASE_PATH: %w", err)
+	}
+	return (&url.URL{Scheme: "http", Host: net.JoinHostPort(host, port), Path: basePath + "/-/health"}).String(), nil
 }

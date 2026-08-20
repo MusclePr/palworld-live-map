@@ -71,7 +71,11 @@ function mockAPI(resolve: (path: string) => unknown = (path) => responses[path])
     'fetch',
     vi.fn(async (input: string | URL | Request) => {
       const path =
-        typeof input === 'string' ? input : input instanceof URL ? input.pathname : new URL(input.url).pathname
+        typeof input === 'string'
+          ? new URL(input, window.location.href).pathname
+          : input instanceof URL
+            ? input.pathname
+            : new URL(input.url).pathname
       const body = resolve(path)
       if (body instanceof Error) throw body
       if (body instanceof Response) return body
@@ -113,7 +117,11 @@ describe('App', () => {
       'fetch',
       vi.fn(async (input: string | URL | Request) => {
         const path =
-          typeof input === 'string' ? input : input instanceof URL ? input.pathname : new URL(input.url).pathname
+          typeof input === 'string'
+            ? new URL(input, window.location.href).pathname
+            : input instanceof URL
+              ? input.pathname
+              : new URL(input.url).pathname
         if (path === '/assets/test-world-catalogue.json') {
           return new Promise<Response>((resolve) => {
             resolveCatalogue = resolve
@@ -197,7 +205,11 @@ describe('App', () => {
       'fetch',
       vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         const path =
-          typeof input === 'string' ? input : input instanceof URL ? input.pathname : new URL(input.url).pathname
+          typeof input === 'string'
+            ? new URL(input, window.location.href).pathname
+            : input instanceof URL
+              ? input.pathname
+              : new URL(input.url).pathname
         if (path === '/assets/test-world-catalogue.json') {
           catalogueSignal = init?.signal instanceof AbortSignal ? init.signal : undefined
           markCatalogueStarted()

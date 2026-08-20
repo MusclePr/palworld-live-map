@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 type Config struct {
 	Addr                string
+	BasePath            string
 	RESTURL             string
 	AdminPassword       string
 	DemoMode            bool
@@ -69,8 +71,13 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	basePath, err := NormalizeBasePath(os.Getenv("BASE_PATH"))
+	if err != nil {
+		return Config{}, fmt.Errorf("BASE_PATH: %w", err)
+	}
 	cfg := Config{
 		Addr:                envOr("ADDR", ":8080"),
+		BasePath:            basePath,
 		RESTURL:             strings.TrimRight(os.Getenv("PALWORLD_REST_URL"), "/"),
 		AdminPassword:       os.Getenv("PALWORLD_ADMIN_PASSWORD"),
 		DemoMode:            demoMode,
@@ -136,6 +143,23 @@ func Load() (Config, error) {
 		}
 	}
 	return cfg, nil
+}
+
+// NormalizeBasePath validates and normalizes a reverse-proxy path prefix, e.g. "palworld-map" or
+// "/palworld-map/" becomes "/palworld-map". Empty input means root ("") deployment.
+func NormalizeBasePath(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", nil
+	}
+	trimmed = "/" + strings.Trim(trimmed, "/")
+	if trimmed == "/" {
+		return "", errors.New("must not be \"/\"; leave empty for root deployment")
+	}
+	if cleaned := path.Clean(trimmed); cleaned != trimmed {
+		return "", fmt.Errorf("must be a clean path without \"..\" or repeated slashes, got %q", value)
+	}
+	return trimmed, nil
 }
 
 func envOr(key, fallback string) string {

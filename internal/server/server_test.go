@@ -598,6 +598,73 @@ func TestServerServesViteFrontendAssets(t *testing.T) {
 	}
 }
 
+func TestServerServesUnderConfiguredBasePath(t *testing.T) {
+	cfg := testConfig()
+	cfg.BasePath = "/palworld-map"
+	service, err := New(cfg, fixedSnapshot{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	bare := httptest.NewRecorder()
+	service.Handler().ServeHTTP(bare, httptest.NewRequest(http.MethodGet, "/palworld-map", nil))
+	if bare.Code != http.StatusMovedPermanently || bare.Header().Get("Location") != "/palworld-map/" {
+		t.Fatalf("bare prefix response = status %d, location %q", bare.Code, bare.Header().Get("Location"))
+	}
+
+	index := httptest.NewRecorder()
+	service.Handler().ServeHTTP(index, httptest.NewRequest(http.MethodGet, "/palworld-map/", nil))
+	if index.Code != http.StatusOK || !strings.Contains(index.Body.String(), `<div id="root"></div>`) {
+		t.Fatalf("index response = status %d, body %s", index.Code, index.Body.String())
+	}
+
+	config := httptest.NewRecorder()
+	service.Handler().ServeHTTP(config, httptest.NewRequest(http.MethodGet, "/palworld-map/api/config", nil))
+	if config.Code != http.StatusOK {
+		t.Fatalf("api config response = status %d", config.Code)
+	}
+
+	unprefixed := httptest.NewRecorder()
+	service.Handler().ServeHTTP(unprefixed, httptest.NewRequest(http.MethodGet, "/api/config", nil))
+	if unprefixed.Code != http.StatusNotFound {
+		t.Fatalf("unprefixed request should 404, got status %d", unprefixed.Code)
+	}
+}
+
+func TestRoutesRespectConfiguredBasePath(t *testing.T) {
+	service := &Server{
+		basePath: "/palworld-map",
+		assets: fstest.MapFS{
+			"index.html": &fstest.MapFile{Data: []byte(`<div id="root"></div>`)},
+		},
+	}
+	service.handler = service.securityHeaders(service.routes())
+
+	bare := httptest.NewRecorder()
+	service.Handler().ServeHTTP(bare, httptest.NewRequest(http.MethodGet, "/palworld-map", nil))
+	if bare.Code != http.StatusMovedPermanently || bare.Header().Get("Location") != "/palworld-map/" {
+		t.Fatalf("bare prefix response = status %d, location %q", bare.Code, bare.Header().Get("Location"))
+	}
+
+	index := httptest.NewRecorder()
+	service.Handler().ServeHTTP(index, httptest.NewRequest(http.MethodGet, "/palworld-map/", nil))
+	if index.Code != http.StatusOK || !strings.Contains(index.Body.String(), `<div id="root"></div>`) {
+		t.Fatalf("index response = status %d, body %s", index.Code, index.Body.String())
+	}
+
+	health := httptest.NewRecorder()
+	service.Handler().ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/palworld-map/-/health", nil))
+	if health.Code != http.StatusOK {
+		t.Fatalf("health response = status %d", health.Code)
+	}
+
+	unprefixed := httptest.NewRecorder()
+	service.Handler().ServeHTTP(unprefixed, httptest.NewRequest(http.MethodGet, "/-/health", nil))
+	if unprefixed.Code != http.StatusNotFound {
+		t.Fatalf("unprefixed request should 404, got status %d", unprefixed.Code)
+	}
+}
+
 func TestServerSelectsPrecompressedHashedAssets(t *testing.T) {
 	service := &Server{assets: fstest.MapFS{
 		"assets/app-deadbeef.js":    &fstest.MapFile{Data: []byte("identity")},
@@ -654,7 +721,8 @@ func TestLoadMapLayersUsesManifestArtworkForShippedLayers(t *testing.T) {
 	service.handler = service.securityHeaders(service.routes())
 	started := time.Now()
 	response := &deadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
-	service.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, layers[0].ImageURL, nil))
+	requestPath := "/" + strings.TrimPrefix(layers[0].ImageURL, "./")
+	service.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, requestPath, nil))
 	if response.Code != http.StatusOK || response.Body.String() != "test map artwork" {
 		t.Fatalf("map response = status %d, body %q", response.Code, response.Body.String())
 	}
