@@ -24,7 +24,8 @@ FROM mcr.microsoft.com/dotnet/runtime:10.0.11-noble@sha256:a365ce6a50b09176855d0
 ARG MAPPINGS_COMMIT=0e4ae19a05ba0d9fb95d859c09b28f168cb3624f
 ARG MAPPINGS_SHA256=604550ba90faab1e394c2789f38eeff625493d3729c2d7f6a6058bfedb90a67b
 ADD https://raw.githubusercontent.com/PalworldModding/UsefulFiles/${MAPPINGS_COMMIT}/Mappings.usmap /mappings.usmap
-RUN printf '%s  /mappings.usmap\n' "${MAPPINGS_SHA256}" | sha256sum -c -
+RUN printf '%s  /mappings.usmap\n' "${MAPPINGS_SHA256}" | sha256sum -c - \
+    && chmod 644 /mappings.usmap
 
 WORKDIR /app
 COPY --from=build /out ./

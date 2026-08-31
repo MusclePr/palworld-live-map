@@ -40,6 +40,7 @@ if [ -n "$game_version" ]; then
   set -- "$@" --game-version "$game_version"
 fi
 docker run --rm \
+  --user "$(id -u):$(id -g)" \
   --mount "type=bind,src=$pak_directory,dst=/palworld-paks,readonly" \
   --mount "type=bind,src=$output_directory,dst=/output" \
   --mount "type=bind,src=$landmark_output_directory,dst=/landmark-output" \
